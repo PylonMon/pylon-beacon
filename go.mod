@@ -1,3 +1,3 @@
-module github.com/joshuaGlass808/pylon-beacon
+module github.com/PylonMon/pylon-beacon
 
 go 1.22

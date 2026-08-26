@@ -14,6 +14,27 @@ Nothing scrapes you. Nothing listens. If the box goes silent, you get paged:
 - Auto-creates its own monitor in PylonMon on first push — no clicking
 - Extensible: add your own metrics with one config line each
 
+It's open source (MIT) and built to be read: the whole agent is about 3,400
+lines of standard-library Go, so putting it on a machine you care about doesn't
+mean trusting a black box. Contributions, bug reports, and "I couldn't monitor
+my weird box" stories are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Contents
+
+- [Install](#install)
+- [The API key](#the-api-key)
+- [Configuration](#configuration) — the basics, and `[custom]` metrics
+- [Watching the LAN: `[probes]`](#watching-the-lan-probes) — http / tcp / ping from inside
+- [Watching network gear: `[snmp]`](#watching-network-gear-snmp) — switches, firewalls, PDUs
+- [Watching Proxmox: `[proxmox]`](#watching-proxmox-proxmox) — the whole cluster, one line
+- [Watching logs: `[logwatch]`](#watching-logs-logwatch) — alert on an error *rate*
+- [Shipping logs: `[logs]`](#shipping-logs-logs) — send the lines to PylonMon
+- [Built-in collectors](#built-in-collectors)
+- [What happens in PylonMon](#what-happens-in-pylonmon)
+- [The wire format](#the-wire-format) — POST JSON yourself, no agent required
+- [Service management](#service-management)
+- [Contributing](#contributing)
+
 ## Install
 
 **From source** (any platform with Go). This is the recommended route: the
@@ -21,7 +42,7 @@ whole agent is standard-library Go across a dozen files, so reading it before
 you run it on your machines is actually realistic.
 
 ```sh
-git clone https://github.com/joshuaGlass808/pylon-beacon
+git clone https://github.com/PylonMon/pylon-beacon
 cd pylon-beacon
 go build -o pylon-beacon .
 ```
@@ -372,6 +393,15 @@ Windows (PowerShell as admin):
 Get-Service pylon-beacon
 Restart-Service pylon-beacon
 ```
+
+## Contributing
+
+Pull requests, issues, and questions are all welcome — you don't need to ask
+first. The project is small and dependency-free on purpose, so reading it before
+you change it is realistic. [CONTRIBUTING.md](CONTRIBUTING.md) has the build and
+test commands, a map of the files, and the handful of design principles the code
+already follows (the big one: *the silence is the signal* — nothing may delay a
+check-in).
 
 ## License
 

@@ -11,7 +11,7 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
   exit 1
 }
 
-$repo = "joshuaGlass808/pylon-beacon"
+$repo = "PylonMon/pylon-beacon"
 $dir  = "$env:ProgramFiles\pylon-beacon"
 $exe  = "$dir\pylon-beacon.exe"
 $conf = "$dir\beacon.conf"

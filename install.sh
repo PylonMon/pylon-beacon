@@ -4,7 +4,7 @@
 #         PYLON_KEY=pm_xxx curl -fsSL https://pylonmon.com/beacon.sh | sh   (non-interactive)
 set -e
 
-REPO="joshuaGlass808/pylon-beacon"
+REPO="PylonMon/pylon-beacon"
 BIN="/usr/local/bin/pylon-beacon"
 CONF="/etc/pylon-beacon.conf"
 UNIT="/etc/systemd/system/pylon-beacon.service"
