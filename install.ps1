@@ -28,12 +28,14 @@ if (-not (Test-Path $conf)) {
     $key = Read-Host "PylonMon API key (ingest-scoped; Settings -> Admin -> Status page & API)"
   }
   $pyurl = if ($env:PYLON_URL) { $env:PYLON_URL } else { "https://pylonmon.com" }
+  $tmpl = if ($env:PYLON_TEMPLATE) { "template = $env:PYLON_TEMPLATE" } else { "# template = default          # which beacon template configures this node" }
   @"
 # pylon-beacon — https://pylonmon.com/docs#beacon
 key      = $key
 url      = $pyurl
 # node   = $env:COMPUTERNAME     # uncomment to override the monitor name
 interval = 20
+$tmpl
 
 [custom]
 # name = command   (first number in the output becomes the metric)

@@ -2,6 +2,7 @@
 # pylon-beacon installer (Linux) — https://pylonmon.com/docs#beacon
 # Usage:  curl -fsSL https://pylonmon.com/beacon.sh | sh
 #         PYLON_KEY=pm_xxx curl -fsSL https://pylonmon.com/beacon.sh | sh   (non-interactive)
+#         PYLON_TEMPLATE=db-servers picks which beacon template configures the node
 set -e
 
 REPO="PylonMon/pylon-beacon"
@@ -46,6 +47,7 @@ key      = $KEY
 url      = ${PYLON_URL:-https://pylonmon.com}
 # node   = $(hostname)        # uncomment to override the monitor name
 interval = 20
+${PYLON_TEMPLATE:+template = $PYLON_TEMPLATE}
 
 [custom]
 # name = command   (first number in the output becomes the metric)

@@ -27,13 +27,14 @@ import (
 	"time"
 )
 
-const version = "0.7.2"
+const version = "0.7.3"
 
 type config struct {
 	Key      string
 	URL      string
 	Node     string
 	Interval int
+	Template string            // which beacon template seeds this node's monitor (name or id); optional
 	Custom   map[string]string // metric name -> command
 	Logwatch []*logWatch       // [logwatch] entries — see logwatch.go
 	Logs     []*logShip        // [logs] entries — see logship.go
@@ -182,6 +183,8 @@ func loadConfig(path string) (*config, error) {
 			cfg.URL = strings.TrimRight(v, "/")
 		case "node":
 			cfg.Node = v
+		case "template":
+			cfg.Template = v
 		case "interval":
 			if n, err := strconv.Atoi(v); err == nil {
 				cfg.Interval = n
@@ -247,6 +250,11 @@ func runCustom(command string) (float64, bool) {
 func push(cfg *config, metrics map[string]any, samples map[string]string, probes []probeResult, timeout time.Duration) error {
 	payload := map[string]any{
 		"node": cfg.Node, "interval": cfg.Interval, "metrics": metrics,
+	}
+	if cfg.Template != "" {
+		// only matters on the node's first check-in, when its monitor is
+		// created; older servers ignore the field
+		payload["template"] = cfg.Template
 	}
 	if len(samples) > 0 {
 		// text samples captured by [logwatch] — servers that predate them
