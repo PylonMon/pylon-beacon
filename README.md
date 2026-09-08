@@ -97,7 +97,7 @@ node     = db01                   # monitor name; defaults to this hostname
 interval = 20                     # seconds between pushes (default 20, min 15)
 template = db-servers             # beacon template (name or id) that configures this node's
                                   # monitor on its first check-in; omit to use the workspace's
-                                  # template named "default" (or its oldest one)
+                                  # newest template
 
 # ---- extend what it collects ----
 # Each entry under [custom] runs on every push. The FIRST NUMBER found in the

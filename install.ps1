@@ -28,7 +28,7 @@ if (-not (Test-Path $conf)) {
     $key = Read-Host "PylonMon API key (ingest-scoped; Settings -> Admin -> Status page & API)"
   }
   $pyurl = if ($env:PYLON_URL) { $env:PYLON_URL } else { "https://pylonmon.com" }
-  $tmpl = if ($env:PYLON_TEMPLATE) { "template = $env:PYLON_TEMPLATE" } else { "# template = default          # which beacon template configures this node" }
+  $tmpl = if ($env:PYLON_TEMPLATE) { "template = $env:PYLON_TEMPLATE" } else { "# template = db-servers       # which beacon template configures this node (newest if unset)" }
   @"
 # pylon-beacon — https://pylonmon.com/docs#beacon
 key      = $key
