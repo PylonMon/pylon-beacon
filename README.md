@@ -1,4 +1,4 @@
-# <picture><source media="(prefers-color-scheme: dark)" srcset="logo.svg"><img src="logo-light.svg" alt="" width="34" align="top"></picture> pylon-beacon
+# <picture><source media="(prefers-color-scheme: dark)" srcset="logo.svg"><img src="logo-light.svg" alt="PylonMon Beacon logo" width="48" align="middle"></picture> pylon-beacon
 
 **One binary. No open ports. Full node vitals.**
 
