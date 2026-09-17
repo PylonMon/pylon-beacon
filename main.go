@@ -90,12 +90,15 @@ func loadConfig(path string) (*config, error) {
 			continue
 		}
 		k, v = strings.TrimSpace(k), strings.TrimSpace(v)
-		// A trailing comment is not part of the value. This is how
+		// A trailing comment is not part of a top-level value. This is how
 		// `node = kuruk.avatarmc.pro   # uncomment to override the monitor name`
 		// became a monitor literally named that. Only a marker that FOLLOWS
 		// whitespace counts, so a # inside a value (URL fragment, password)
-		// is left alone.
-		v = stripTrailingComment(v)
+		// is left alone — and section values are never touched at all:
+		// [custom] holds shell commands, where `a ; b` and `# …` are code.
+		if section == "" {
+			v = stripTrailingComment(v)
+		}
 		if section == "custom" {
 			if k != "" && v != "" {
 				cfg.Custom[sanitizeMetricName(k)] = v

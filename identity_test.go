@@ -87,3 +87,21 @@ func TestParserDropsTrailingCommentOnNode(t *testing.T) {
 		t.Fatalf("node = %q — the trailing comment leaked into the monitor name again", cfg.Node)
 	}
 }
+
+// Section values are shell commands and community strings, where ` ; ` and
+// ` # ` are code. Comment stripping must never reach them.
+func TestSectionValuesKeepSemicolonsAndHashes(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "beacon.conf")
+	os.WriteFile(p, []byte("key = k\n[custom]\nqueue = cd /tmp ; ls | wc -l\nhashes = grep -c ' #' /etc/motd\n"), 0o600)
+	cfg, err := loadConfig(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Custom["queue"]; got != "cd /tmp ; ls | wc -l" {
+		t.Fatalf("a ` ; ` inside a custom command was cut: %q", got)
+	}
+	if got := cfg.Custom["hashes"]; got != "grep -c ' #' /etc/motd" {
+		t.Fatalf("a ` #` inside a custom command was cut: %q", got)
+	}
+}
