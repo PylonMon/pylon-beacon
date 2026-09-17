@@ -3,18 +3,22 @@
 package main
 
 import (
+	"os/exec"
+	"strconv"
+	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
 var (
-	kernel32             = syscall.NewLazyDLL("kernel32.dll")
-	pGlobalMemoryStatus  = kernel32.NewProc("GlobalMemoryStatusEx")
-	pGetTickCount64      = kernel32.NewProc("GetTickCount64")
-	pGetSystemTimes      = kernel32.NewProc("GetSystemTimes")
-	pGetDiskFreeSpaceEx  = kernel32.NewProc("GetDiskFreeSpaceExW")
-	pGetLogicalDrives    = kernel32.NewProc("GetLogicalDriveStringsW")
-	pGetDriveType        = kernel32.NewProc("GetDriveTypeW")
+	kernel32            = syscall.NewLazyDLL("kernel32.dll")
+	pGlobalMemoryStatus = kernel32.NewProc("GlobalMemoryStatusEx")
+	pGetTickCount64     = kernel32.NewProc("GetTickCount64")
+	pGetSystemTimes     = kernel32.NewProc("GetSystemTimes")
+	pGetDiskFreeSpaceEx = kernel32.NewProc("GetDiskFreeSpaceExW")
+	pGetLogicalDrives   = kernel32.NewProc("GetLogicalDriveStringsW")
+	pGetDriveType       = kernel32.NewProc("GetDriveTypeW")
 )
 
 type memoryStatusEx struct {
@@ -106,6 +110,26 @@ func collect() map[string]any {
 	}
 	// temp_c: not exposed by stable Win32 APIs — add one under [custom] if your
 	// hardware vendor's CLI reports it.
+
+	// net_rx_bps / net_tx_bps — `netstat -e` prints the interface totals
+	// ("Bytes  <received> <sent>") in every Windows since XP, in ~50 ms; the
+	// IP Helper table would need a struct per Windows version. Totals only
+	// (no per-interface breakdown on Windows).
+	if out, err := exec.Command("netstat", "-e").Output(); err == nil {
+		for _, line := range strings.Split(string(out), "\n") {
+			f := strings.Fields(line)
+			if len(f) == 3 && strings.EqualFold(f[0], "Bytes") {
+				rx, e1 := strconv.ParseUint(f[1], 10, 64)
+				tx, e2 := strconv.ParseUint(f[2], 10, 64)
+				if e1 == nil && e2 == nil {
+					netRates(m, map[string][2]uint64{"all": {rx, tx}}, time.Now())
+					delete(m, "net_if_rx_bps") // one pseudo-interface is not a breakdown
+					delete(m, "net_if_tx_bps")
+				}
+				break
+			}
+		}
+	}
 	return m
 }
 

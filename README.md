@@ -111,6 +111,12 @@ battery_pct   = powershell -c "(Get-CimInstance Win32_Battery).EstimatedChargeRe
 site_up       = sh -c "curl -sf http://localhost/ >/dev/null && echo 1 || echo 0"
 ```
 
+**Built-in vitals** (no config): `cpu_pct`, `mem_pct`, `disk_pct` per mount,
+`load1`, `temp_c` (Linux), `uptime_s`, and network throughput — `net_rx_bps` /
+`net_tx_bps` over real interfaces, plus `net_if_rx_bps <iface>` /
+`net_if_tx_bps <iface>` per interface on Linux (totals only on Windows).
+Graph them, or set a vital rule such as `net_tx_bps > 50000000 for 10m`.
+
 **Monitoring a web server?** For *public* up/down, a normal off-site PylonMon
 HTTP monitor is the better tool — it sees what your visitors see. Use the
 `site_up` recipe above for a *local* check the outside world can't do (is the
@@ -141,6 +147,12 @@ That means a rename is an edit, not a new node:
 - Change `node =` (or the hostname) and restart: the existing monitor takes
   the new name on the next push. History, vital rules, probes, channels and
   incident policy all stay. Nothing pages.
+- Prefer to name it in PylonMon? Rename the monitor in the web UI and that
+  name **sticks**: the agent's name is only used to match the machine, and a
+  check-in never overwrites a name you chose. Probes follow the monitor's
+  name.
+- Spaces are fine (`node = SCS Print 1`); quotes are not needed and are
+  stripped if you add them.
 - If the old name is still checking in when the new one appears, PylonMon
   holds both for one interval, then folds the new one into the old monitor
   under the new name once the old name goes quiet. The workspace log records

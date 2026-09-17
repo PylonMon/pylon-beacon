@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // previous CPU counters — cpu_pct is the busy fraction of the time between
@@ -122,6 +123,30 @@ func collect() map[string]any {
 		if len(disks) > 0 {
 			m["disk_pct"] = disks
 		}
+	}
+
+	// net_rx_bps / net_tx_bps — bytes per second since the previous gather,
+	// summed over real interfaces (no loopback), plus per-interface figures for
+	// the ones carrying traffic. /proc/net/dev: iface: rx_bytes … (col 1)
+	// … tx_bytes (col 9). First push omits it, like cpu_pct.
+	if b, err := os.ReadFile("/proc/net/dev"); err == nil {
+		now := time.Now()
+		cur := map[string][2]uint64{}
+		for _, line := range strings.Split(string(b), "\n") {
+			name, rest, ok := strings.Cut(line, ":")
+			if !ok {
+				continue
+			}
+			name = strings.TrimSpace(name)
+			f := strings.Fields(rest)
+			if name == "" || name == "lo" || len(f) < 9 || strings.HasPrefix(name, "veth") || strings.HasPrefix(name, "docker") || strings.HasPrefix(name, "br-") {
+				continue
+			}
+			rx, _ := strconv.ParseUint(f[0], 10, 64)
+			tx, _ := strconv.ParseUint(f[8], 10, 64)
+			cur[name] = [2]uint64{rx, tx}
+		}
+		netRates(m, cur, now)
 	}
 	return m
 }

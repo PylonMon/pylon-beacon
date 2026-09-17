@@ -64,7 +64,14 @@ func stripTrailingComment(v string) string {
 			v = v[:i]
 		}
 	}
-	return strings.TrimSpace(v)
+	v = strings.TrimSpace(v)
+	// `node = "SCS Print 1"` — people quote values with spaces out of habit,
+	// and the quotes became part of the monitor name. Spaces need no quotes;
+	// matching surrounding quotes are dropped.
+	if n := len(v); n >= 2 && (v[0] == '"' && v[n-1] == '"' || v[0] == '\'' && v[n-1] == '\'') {
+		v = strings.TrimSpace(v[1 : n-1])
+	}
+	return v
 }
 
 // loadConfig parses the ini-ish config: `key = value` lines, comments with #,

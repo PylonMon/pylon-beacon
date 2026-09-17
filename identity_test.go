@@ -67,6 +67,10 @@ func TestTrailingCommentIsNotPartOfTheValue(t *testing.T) {
 		"https://x.test/page#frag": "https://x.test/page#frag", // URL fragment survives
 		"p@ss#word":                "p@ss#word",                // so does a password
 		"plain":                    "plain",
+		`"SCS Print 1"`:            "SCS Print 1", // quotes out of habit — dropped (T-301)
+		`'SCS Print 1'  # lab`:     "SCS Print 1",
+		`SCS Print 1`:              "SCS Print 1", // spaces need no quotes
+		`"unbalanced`:              `"unbalanced`, // not a quoted value — left alone
 	} {
 		if got := stripTrailingComment(in); got != want {
 			t.Errorf("stripTrailingComment(%q) = %q, want %q", in, got, want)
