@@ -33,7 +33,9 @@ if (-not (Test-Path $conf)) {
 # pylon-beacon — https://pylonmon.com/docs#beacon
 key      = $key
 url      = $pyurl
-# node   = $env:COMPUTERNAME     # uncomment to override the monitor name
+# The monitor is named after the machine. To use a different name,
+# uncomment the next line (renaming keeps the same monitor - no duplicate):
+# node   = $env:COMPUTERNAME
 interval = 20
 $tmpl
 

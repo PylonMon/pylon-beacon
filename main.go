@@ -33,6 +33,7 @@ type config struct {
 	Key      string
 	URL      string
 	Node     string
+	ID       string // stable machine identity (identity.go) — never from the config file
 	Interval int
 	Template string            // which beacon template seeds this node's monitor (name or id); optional
 	Custom   map[string]string // metric name -> command
@@ -52,6 +53,18 @@ func defaultConfigPath() string {
 		return "beacon.conf"
 	}
 	return "/etc/pylon-beacon.conf"
+}
+
+// stripTrailingComment drops a " # …" or " ; …" tail from a config value. The
+// marker must follow whitespace: `abc#def` is a value, `abc # def` is a value
+// with a comment.
+func stripTrailingComment(v string) string {
+	for _, m := range []string{" #", "\t#", " ;", "\t;"} {
+		if i := strings.Index(v, m); i >= 0 {
+			v = v[:i]
+		}
+	}
+	return strings.TrimSpace(v)
 }
 
 // loadConfig parses the ini-ish config: `key = value` lines, comments with #,
@@ -77,6 +90,12 @@ func loadConfig(path string) (*config, error) {
 			continue
 		}
 		k, v = strings.TrimSpace(k), strings.TrimSpace(v)
+		// A trailing comment is not part of the value. This is how
+		// `node = kuruk.avatarmc.pro   # uncomment to override the monitor name`
+		// became a monitor literally named that. Only a marker that FOLLOWS
+		// whitespace counts, so a # inside a value (URL fragment, password)
+		// is left alone.
+		v = stripTrailingComment(v)
 		if section == "custom" {
 			if k != "" && v != "" {
 				cfg.Custom[sanitizeMetricName(k)] = v
@@ -250,6 +269,9 @@ func runCustom(command string) (float64, bool) {
 func push(cfg *config, metrics map[string]any, samples map[string]string, probes []probeResult, timeout time.Duration) error {
 	payload := map[string]any{
 		"node": cfg.Node, "interval": cfg.Interval, "metrics": metrics,
+		// stable identity, so a renamed node edits its monitor instead of
+		// spawning a duplicate (identity.go); older servers ignore it
+		"id": cfg.ID,
 	}
 	if cfg.Template != "" {
 		// only matters on the node's first check-in, when its monitor is
@@ -473,6 +495,7 @@ func main() {
 	if err != nil && !os.IsNotExist(err) {
 		log.Fatalf("config %s: %v", *cfgPath, err)
 	}
+	cfg.ID = machineID(*cfgPath) // identity.go — from the OS, never the config
 	// environment overrides (and the way to run with no config file at all)
 	if v := os.Getenv("PYLON_KEY"); v != "" {
 		cfg.Key = v

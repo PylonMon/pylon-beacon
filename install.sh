@@ -45,7 +45,9 @@ if [ ! -f "$CONF" ]; then
 # pylon-beacon — https://pylonmon.com/docs#beacon
 key      = $KEY
 url      = ${PYLON_URL:-https://pylonmon.com}
-# node   = $(hostname)        # uncomment to override the monitor name
+# The monitor is named after the machine. To use the full name instead,
+# uncomment the next line (renaming keeps the same monitor — no duplicate):
+# node   = $(hostname -f 2>/dev/null || hostname)
 interval = 20
 ${PYLON_TEMPLATE:+template = $PYLON_TEMPLATE}
 
