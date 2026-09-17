@@ -192,6 +192,11 @@ Notes:
   inherits the node's alert channels. If the agent itself goes quiet, the
   node's silence page covers everything — probes go stale rather than paging
   twenty times.
+- A probe counts as **down after two failed samples in a row** (about 40
+  seconds at the default interval). One missed sample shows in the monitor's
+  timeline but never pages. Change it per probe in PylonMon with "Alert after
+  N fails" (1 pages on a single miss), and give anything that restarts on a
+  schedule a maintenance window.
 
 ## Watching network gear: `[snmp]`
 
