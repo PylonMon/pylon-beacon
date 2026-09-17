@@ -105,3 +105,21 @@ func TestSectionValuesKeepSemicolonsAndHashes(t *testing.T) {
 		t.Fatalf("a ` #` inside a custom command was cut: %q", got)
 	}
 }
+
+// The documented config annotates probe and snmp lines with trailing comments.
+// Those must parse as written on the docs page.
+func TestProbeAndSnmpLinesAcceptTrailingComments(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "beacon.conf")
+	os.WriteFile(p, []byte("key = k\n[probes]\npihole = http http://192.168.1.240/admin   # up = any response below 500\nslow_box = http https://10.0.0.9:8443 10     # per-probe timeout\n[snmp]\ntarget    = 192.168.1.1          # host or host:port (default 161)\ncommunity = public\n"), 0o600)
+	cfg, err := loadConfig(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Probes) != 2 {
+		t.Fatalf("want 2 probes from the documented lines, got %d", len(cfg.Probes))
+	}
+	if cfg.SNMP == nil || cfg.SNMP.Target != "192.168.1.1" {
+		t.Fatalf("snmp target kept its comment: %+v", cfg.SNMP)
+	}
+}

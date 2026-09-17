@@ -93,7 +93,7 @@ key      = pm_xxxxxxxxxxxx        # your ingest-scoped PylonMon API key
 
 # ---- optional ----
 url      = https://pylonmon.com   # your PylonMon instance
-node     = db01                   # monitor name; defaults to this hostname
+node     = db01                   # monitor name; defaults to this hostname (safe to change later — see below)
 interval = 20                     # seconds between pushes (default 20, min 15)
 template = db-servers             # beacon template (name or id) that configures this node's
                                   # monitor on its first check-in; omit to use the workspace's
@@ -125,6 +125,35 @@ Notes on `[custom]`:
   the heartbeat.
 - Name metrics with units in the suffix (`_pct`, `_c`, `_s`) and PylonMon
   formats them accordingly.
+
+## Renaming a node
+
+The monitor's name comes from `node =` (or the hostname), but the monitor's
+*identity* does not. On every push the beacon sends a stable, hashed machine
+id taken from the OS — `/etc/machine-id` on Linux, the `MachineGuid` on
+Windows, the platform UUID on macOS — never anything from the config file.
+Config edits, agent upgrades and reinstalls leave it alone. (Where the OS
+offers none, a UUID is minted once and kept in `beacon.id` beside the config.)
+The raw value is never sent.
+
+That means a rename is an edit, not a new node:
+
+- Change `node =` (or the hostname) and restart: the existing monitor takes
+  the new name on the next push. History, vital rules, probes, channels and
+  incident policy all stay. Nothing pages.
+- If the old name is still checking in when the new one appears, PylonMon
+  holds both for one interval, then folds the new one into the old monitor
+  under the new name once the old name goes quiet. The workspace log records
+  the rename.
+- Two machines from one image (a VM template or a Windows image restored
+  without sysprep) share a machine id. They are kept as two monitors as long
+  as both keep reporting — the log notes that they share an identity, which
+  is your cue to regenerate it on the clone (`systemd-machine-id-setup` /
+  `sysprep`).
+- Reimaging a box keeps its monitor: the same name with a fresh machine id
+  simply rebinds.
+
+Older agents that send no id are matched by name, exactly as before.
 
 ## Watching the LAN: `[probes]`
 
