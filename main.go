@@ -12,7 +12,10 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
+	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -24,6 +27,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -285,7 +289,7 @@ func runCustom(command string) (float64, bool) {
 	return f, perr == nil
 }
 
-func push(cfg *config, metrics map[string]any, samples map[string]string, probes []probeResult, timeout time.Duration) error {
+func push(cfg *config, metrics map[string]any, samples map[string]string, probes []probeResult, timeout time.Duration, fresh bool) error {
 	payload := map[string]any{
 		"node": cfg.Node, "interval": cfg.Interval, "metrics": metrics,
 		// stable identity, so a renamed node edits its monitor instead of
@@ -307,14 +311,72 @@ func push(cfg *config, metrics map[string]any, samples map[string]string, probes
 		payload["probes"] = probes
 	}
 	body, _ := json.Marshal(payload)
-	req, err := http.NewRequest("POST", cfg.URL+"/api/ingest/exporter", bytes.NewReader(body))
+	if fresh {
+		// second attempt: never reuse the connection the first one failed on
+		pushTransport.CloseIdleConnections()
+	}
+	err := postCheckIn(cfg, body, gzipOK.Load(), timeout)
+	var rejected *gzipRejected
+	if errors.As(err, &rejected) {
+		// a server that predates compressed check-ins: say so once, stop
+		// compressing for the life of this process, and send this one plain
+		log.Printf("server did not accept a compressed check-in (%v) — sending uncompressed from now on", err)
+		gzipOK.Store(false)
+		err = postCheckIn(cfg, body, false, timeout)
+	}
+	return err
+}
+
+// pushTransport carries every check-in. Two deliberate choices, both from a
+// customer's domain controller whose check-ins kept reaching the server as
+// headers with NO body (2026-09-18) — the node was paged as silent while it was
+// up and pushing:
+//
+//   - HTTP/1.1 only. Over HTTP/2 the headers and the body are separate frames,
+//     so a request can be delivered in halves. Over HTTP/1.1 Go writes the
+//     headers and a small body in ONE flush: it arrives whole or not at all.
+//   - which is why the body is gzipped (postCheckIn): a check-in compresses to
+//     a few hundred bytes, so headers + body fit in a single small packet —
+//     well under any path's MTU, and nothing for a middlebox to cut in two.
+//
+// One shared transport also keeps the TLS session warm between check-ins, so a
+// busy machine does not pay a full handshake inside every attempt's deadline.
+var pushTransport = &http.Transport{
+	Proxy:               http.ProxyFromEnvironment,
+	TLSNextProto:        map[string]func(string, *tls.Conn) http.RoundTripper{}, // non-nil and empty = no HTTP/2
+	TLSHandshakeTimeout: 8 * time.Second,
+	IdleConnTimeout:     90 * time.Second,
+	MaxIdleConnsPerHost: 2,
+}
+
+// gzipOK turns false the first time a server refuses a compressed check-in.
+var gzipOK = func() *atomic.Bool { b := &atomic.Bool{}; b.Store(true); return b }()
+
+// gzipRejected marks a refusal that is about the ENCODING, not the check-in.
+type gzipRejected struct{ msg string }
+
+func (g *gzipRejected) Error() string { return g.msg }
+
+func postCheckIn(cfg *config, body []byte, compress bool, timeout time.Duration) error {
+	send := body
+	if compress {
+		var zb bytes.Buffer
+		zw := gzip.NewWriter(&zb)
+		zw.Write(body)
+		zw.Close()
+		send = zb.Bytes()
+	}
+	req, err := http.NewRequest("POST", cfg.URL+"/api/ingest/exporter", bytes.NewReader(send))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Authorization", "Bearer "+cfg.Key)
 	req.Header.Set("Content-Type", "application/json")
+	if compress {
+		req.Header.Set("Content-Encoding", "gzip")
+	}
 	req.Header.Set("User-Agent", "pylon-beacon/"+version+" ("+runtime.GOOS+")")
-	resp, err := (&http.Client{Timeout: timeout}).Do(req)
+	resp, err := (&http.Client{Timeout: timeout, Transport: pushTransport}).Do(req)
 	if err != nil {
 		return err
 	}
@@ -324,7 +386,11 @@ func push(cfg *config, metrics map[string]any, samples map[string]string, probes
 			Error string `json:"error"`
 		}
 		json.NewDecoder(resp.Body).Decode(&e)
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, e.Error)
+		msg := fmt.Sprintf("HTTP %d: %s", resp.StatusCode, e.Error)
+		if compress && (resp.StatusCode == 400 || resp.StatusCode == 415) {
+			return &gzipRejected{msg}
+		}
+		return errors.New(msg)
 	}
 	return nil
 }
@@ -370,7 +436,7 @@ func sendCheckIn(cfg *config, period time.Duration, metrics map[string]any, samp
 	per := pushBudget(period) / pushAttempts
 	var err error
 	for i := 1; i <= pushAttempts; i++ {
-		if err = push(cfg, metrics, samples, probes, per); err == nil {
+		if err = push(cfg, metrics, samples, probes, per, i > 1); err == nil {
 			if i > 1 {
 				log.Printf("pushed %d metric(s) (attempt %d)", len(metrics), i)
 			} else {
