@@ -17,6 +17,15 @@ $exe  = "$dir\pylon-beacon.exe"
 $conf = "$dir\beacon.conf"
 
 New-Item -ItemType Directory -Force $dir | Out-Null
+# Upgrade: Windows will not overwrite a running executable, so stop the agent
+# first when it is already installed. The config is kept (below) and the task
+# is re-registered and started again at the end — re-running this script IS
+# the upgrade.
+if (Get-ScheduledTask -TaskName "pylon-beacon" -ErrorAction SilentlyContinue) {
+  Write-Host "-> stopping the running agent for upgrade..."
+  Stop-ScheduledTask -TaskName "pylon-beacon" -ErrorAction SilentlyContinue
+  Start-Sleep -Seconds 2
+}
 Write-Host "-> downloading pylon-beacon (windows/amd64)..."
 Invoke-WebRequest -UseBasicParsing `
   -Uri "https://github.com/$repo/releases/latest/download/pylon-beacon-windows-amd64.exe" `

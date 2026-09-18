@@ -132,6 +132,24 @@ Notes on `[custom]`:
 - Name metrics with units in the suffix (`_pct`, `_c`, `_s`) and PylonMon
   formats them accordingly.
 
+## Upgrading
+
+Re-run the installer. It downloads the latest release, keeps your existing
+config, and restarts the agent; the node keeps its monitor and history.
+
+```sh
+# Linux
+curl -fsSL https://pylonmon.com/beacon.sh | sh
+```
+
+```powershell
+# Windows (PowerShell as Administrator)
+irm https://pylonmon.com/beacon.ps1 | iex
+```
+
+Check what's running with `pylon-beacon -version`; releases are listed on
+the [releases page](https://github.com/PylonMon/pylon-beacon/releases).
+
 ## Renaming a node
 
 The monitor's name comes from `node =` (or the hostname), but the monitor's
