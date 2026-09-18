@@ -27,7 +27,13 @@ import (
 	"time"
 )
 
-const version = "0.7.3"
+// version is stamped by the release build from the git tag
+// (-ldflags "-X main.version=..."; see .github/workflows/release.yml), so it
+// cannot drift from the release it shipped in. It used to be a constant edited
+// by hand, and nobody edited it: v0.8.0 and v0.9.0 both reported 0.7.3, so a
+// customer who updated saw no change on their dashboard. A build from source
+// says "dev".
+var version = "dev"
 
 type config struct {
 	Key      string
