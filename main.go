@@ -395,13 +395,21 @@ func postCheckIn(cfg *config, body []byte, compress bool, timeout time.Duration)
 	return nil
 }
 
-// pushBudget splits the interval between delivering this check-in and
-// collecting the next one. Half each: a check-in that spends the whole period
-// trying to be delivered has already missed its slot.
+// pushBudget is how long delivering one check-in may take in total, across
+// both attempts. Collection for the NEXT check-in happens during the wait, so
+// this time comes out of the period: half of it at most, capped.
+//
+// It used to be half the period capped at 10s — 5s per attempt — and 5s turned
+// out to be too little for a machine under pressure. A customer's domain
+// controller at 99% memory (2026-09-18) was measured taking 2.4s just between
+// writing a request's headers and its 185-byte body; add a TLS handshake and
+// the attempt died mid-request, twice, and the node was paged as silent while
+// it was up. 7.5s per attempt at a 30s interval, and the transport now keeps the
+// TLS session warm so the handshake is not paid every time.
 func pushBudget(period time.Duration) time.Duration {
 	b := period / 2
-	if b > 10*time.Second {
-		b = 10 * time.Second // long intervals do not need a long deadline
+	if b > 16*time.Second {
+		b = 16 * time.Second // long intervals do not need a long deadline
 	}
 	if b < 500*time.Millisecond {
 		b = 500 * time.Millisecond
