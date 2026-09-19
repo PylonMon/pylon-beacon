@@ -10,33 +10,42 @@ LD="-X main.releaseBase=http://127.0.0.1:18461/ -X main.updateFirstCheck=2s"
 go build -ldflags "$LD -X main.version=0.9.91" -o "$R/rel/pylon-beacon-$OS-$ARCH" .
 go build -ldflags "$LD -X main.version=0.9.90" -o "$R/agent/pylon-beacon" .
 ( cd "$R/rel" && echo 0.9.91 > VERSION && sha256sum pylon-beacon-* > SHA256SUMS && python3 -m http.server 18461 --bind 127.0.0.1 >/dev/null 2>&1 ) &
-# a stand-in for PylonMon's ingest: records each check-in's agent version
+# a stand-in for PylonMon's ingest: records WHEN each check-in arrived and from
+# which agent version
 python3 - "$R/checkins.log" <<'PY' &
-import sys, http.server
+import sys, time, http.server
 log = sys.argv[1]
 class H(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         self.rfile.read(int(self.headers.get('Content-Length', 0)))
-        open(log, 'a').write(self.headers.get('User-Agent', '?') + '\n')
+        with open(log, 'a') as f:
+            f.write('%.2f %s\n' % (time.time(), self.headers.get('User-Agent', '?')))
         self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers()
         self.wfile.write(b'{"ok":true}')
     def log_message(self, *a): pass
 http.server.HTTPServer(('127.0.0.1', 18460), H).serve_forever()
 PY
 sleep 2
-printf 'key = k\nurl = http://127.0.0.1:18460\nnode = e2e\ninterval = 5\nauto_update = true\n' > "$R/agent/beacon.conf"
+# 15s is the agent's minimum interval
+printf 'key = k\nurl = http://127.0.0.1:18460\nnode = e2e\ninterval = 15\nauto_update = true\n' > "$R/agent/beacon.conf"
 "$R/agent/pylon-beacon" -config "$R/agent/beacon.conf" > "$R/agent.log" 2>&1 &
 PID=$!
-sleep 40
+sleep 65
 echo "--- agent log ---"; cat "$R/agent.log"
-echo "--- check-ins by agent version ---"; sort "$R/checkins.log" | uniq -c
+echo "--- check-ins by agent version ---"; cut -d' ' -f2- "$R/checkins.log" | sort | uniq -c
 grep -q "auto-update: 0.9.90 -> 0.9.91" "$R/agent.log" || { echo "FAIL: the agent never switched"; exit 1; }
 grep -q "pylon-beacon/0.9.91" "$R/checkins.log" || { echo "FAIL: no check-in from the new version"; exit 1; }
 test -f "$R/agent/pylon-beacon.old-0.9.90" || { echo "FAIL: the previous binary was not kept"; exit 1; }
 "$R/agent/pylon-beacon" -version | grep -q "0.9.91" || { echo "FAIL: the binary in place is not the new one"; exit 1; }
 if [ "$OS" != "windows" ]; then
   kill -0 "$PID" 2>/dev/null || { echo "FAIL: the agent process died (it should have replaced itself in place)"; exit 1; }
-  [ "$(tr '\0' ' ' < /proc/$PID/cmdline 2>/dev/null | wc -c)" -gt 0 ] && echo "same PID $PID still running — replaced in place"
+  echo "same PID $PID still running — replaced in place"
 fi
-N=$(wc -l < "$R/checkins.log"); [ "$N" -ge 7 ] || { echo "FAIL: only $N check-ins in 40s at a 5s interval — there was a gap"; exit 1; }
-echo "PASS: $N check-ins, switched 0.9.90 -> 0.9.91 with none missed"
+# THE point of the design: the switch must not cost a check-in. At a 15s
+# interval no two consecutive check-ins may be more than ~20s apart.
+GAP=$(awk 'NR>1{g=$1-p; if(g>m)m=g} {p=$1} END{printf "%.1f", m}' "$R/checkins.log")
+N=$(wc -l < "$R/checkins.log")
+echo "check-ins: $N, longest gap between two: ${GAP}s"
+awk -v g="$GAP" 'BEGIN{exit !(g<=20)}' || { echo "FAIL: a ${GAP}s gap at a 15s interval - the update cost a check-in"; exit 1; }
+[ "$N" -ge 5 ] || { echo "FAIL: only $N check-ins in 65s"; exit 1; }
+echo "PASS: switched 0.9.90 -> 0.9.91, $N check-ins, longest gap ${GAP}s"
