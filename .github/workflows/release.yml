@@ -19,6 +19,12 @@ jobs:
           CGO_ENABLED=0 GOOS=linux   GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=$V" -o dist/pylon-beacon-linux-arm64 .
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$V" -o dist/pylon-beacon-windows-amd64.exe .
           CGO_ENABLED=0 GOOS=darwin  GOARCH=arm64 go build -trimpath -ldflags "-s -w -X main.version=$V" -o dist/pylon-beacon-darwin-arm64 .
+      - name: VERSION and SHA256SUMS (what auto-update reads and verifies against)
+        run: |
+          cd dist
+          echo "${GITHUB_REF_NAME#v}" > VERSION
+          sha256sum pylon-beacon-* > SHA256SUMS
+          cat VERSION SHA256SUMS
       - name: the binary must report the tag it was built from
         run: |
           want="pylon-beacon ${GITHUB_REF_NAME#v}"

@@ -95,6 +95,7 @@ key      = pm_xxxxxxxxxxxx        # your ingest-scoped PylonMon API key
 url      = https://pylonmon.com   # your PylonMon instance
 node     = db01                   # monitor name; defaults to this hostname (safe to change later — see below)
 interval = 20                     # seconds between pushes (default 20, min 15)
+auto_update = true                # keep the agent current by itself (default off — see Upgrading)
 template = db-servers             # beacon template (name or id) that configures this node's
                                   # monitor on its first check-in; omit to use the workspace's
                                   # newest template
@@ -149,6 +150,43 @@ irm https://pylonmon.com/beacon.ps1 | iex
 
 Check what's running with `pylon-beacon -version`; releases are listed on
 the [releases page](https://github.com/PylonMon/pylon-beacon/releases).
+
+### Automatic updates (optional)
+
+Off by default. To have the agent keep itself current, add one line to the
+config and restart it once:
+
+```ini
+auto_update = true
+```
+
+What it does, and what it will not do:
+
+- It looks for a newer release a few minutes after starting and then about
+  every six hours, in the background. Checking and downloading never delay a
+  check-in.
+- A release is installed only after it has **proved itself on that machine**:
+  its SHA-256 matches the release's `SHA256SUMS`, it reports the version it
+  claims to be, and it completes one real check-in using that machine's own
+  config. If any of that fails, nothing changes and it tries again later.
+- The switch happens between two check-ins, so the node is never reported
+  silent because of an update. On Linux and macOS the process replaces itself
+  in place. On Windows the running agent starts the new one and stays on as its
+  parent until the next restart or reboot (you will see two `pylon-beacon.exe`
+  processes; `Stop-ScheduledTask pylon-beacon` stops both).
+- The previous binary is kept beside the new one as `pylon-beacon.old-<version>`
+  (`pylon-beacon.exe.old-<version>` on Windows). To go back, stop the agent,
+  put that file back under the original name, and start it again.
+- It only ever moves forward, only to published releases, and only from this
+  project's GitHub releases over HTTPS. There is no setting, flag or
+  environment variable that changes where updates come from. The checksum
+  protects against a corrupt or partial download; it is not a signature.
+- It needs write access to the directory the agent lives in, which the
+  installers' defaults have. If it cannot write there it says so in its log and
+  carries on running the version it has.
+
+Prefer to stay in control? Leave it off and re-run the installer when you
+choose to, or from your own scheduler.
 
 ## Renaming a node
 

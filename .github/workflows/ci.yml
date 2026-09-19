@@ -29,3 +29,9 @@ jobs:
             echo "--- $t"
             CGO_ENABLED=0 GOOS=${t%/*} GOARCH=${t#*/} go build -trimpath -o /dev/null .
           done
+      # Auto-update replaces the agent's own binary on a customer's machine, so
+      # it is proven end to end on every push: a 0.9.90 agent finds a 0.9.91
+      # "release" on a local server, verifies it, makes it check in, replaces
+      # itself in place, and the check-ins never stop.
+      - name: auto-update end to end
+        run: ./scripts/e2e-autoupdate.sh

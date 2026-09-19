@@ -46,6 +46,9 @@ type config struct {
 	ID       string // stable machine identity (identity.go) — never from the config file
 	Interval int
 	Template string            // which beacon template seeds this node's monitor (name or id); optional
+	// AutoUpdate (auto_update = true): the agent replaces itself with newer
+	// releases — off unless asked for. See autoupdate.go.
+	AutoUpdate bool
 	Custom   map[string]string // metric name -> command
 	Logwatch []*logWatch       // [logwatch] entries — see logwatch.go
 	Logs     []*logShip        // [logs] entries — see logship.go
@@ -227,6 +230,8 @@ func loadConfig(path string) (*config, error) {
 			cfg.Node = v
 		case "template":
 			cfg.Template = v
+		case "auto_update":
+			cfg.AutoUpdate = parseBool(v)
 		case "interval":
 			if n, err := strconv.Atoi(v); err == nil {
 				cfg.Interval = n
@@ -653,6 +658,10 @@ func main() {
 	period := time.Duration(cfg.Interval) * time.Second
 	tick := time.NewTicker(period)
 	defer tick.Stop()
+	if cfg.AutoUpdate && !*once {
+		log.Printf("auto-update: on — checking for newer releases in the background")
+		go runUpdater(*cfgPath)
+	}
 	pushLoop(cfg, period, tick.C, *once, nil)
 }
 
@@ -706,5 +715,8 @@ func pushLoop(cfg *config, period time.Duration, tick <-chan time.Time, once boo
 		// logs ride the same tick, after the check-in — a slow log post must
 		// never make the node look silent
 		shipLogs(cfg, logshipClient)
+		// a proven newer release is waiting: switch now, with a whole interval
+		// before the next check-in is due (autoupdate.go). Usually returns at once.
+		applyStagedUpdate()
 	}
 }
